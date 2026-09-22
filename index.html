@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Outdoors – Maqnelson</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='2' y='6' width='28' height='12' fill='%23005081'/><rect x='2' y='18' width='28' height='3' fill='%23FDDC00'/><rect x='14' y='21' width='4' height='9' fill='%23005081'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --azul-escuro:#005081; --azul:#1D8ECE; --verde:#1EA438; --amarelo:#FDDC00;
+  --laranja:#E07B00; --cinza:#8795A1; --vermelho:#C62828;
+  --fundo:#EDF1F4; --superficie:#FFFFFF; --tinta:#132530; --suave:#5A6A76; --linha:#D3DCE2;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:var(--tinta);background:var(--fundo)}
+h1,h2,h3{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:600;margin:0;line-height:1.15}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--azul);outline-offset:2px}
+body.visualizador .so-editor{display:none!important}
+
+/* Telas de acesso */
+.tela{min-height:100vh;display:grid;place-items:center;padding:24px}
+.cartao-acesso{background:var(--superficie);width:100%;max-width:440px;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px var(--linha)}
+.cartao-acesso .faixa{height:10px;background:linear-gradient(90deg,var(--azul-escuro) 0 55%,var(--azul) 55% 75%,var(--verde) 75% 90%,var(--amarelo) 90%)}
+.cartao-acesso .corpo{padding:32px}
+.cartao-acesso h1{font-size:34px;color:var(--azul-escuro);margin-bottom:8px}
+.cartao-acesso p{color:var(--suave);margin:0 0 24px}
+.cartao-acesso code{background:var(--fundo);padding:1px 5px;border-radius:3px}
+
+/* Botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:4px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--azul-escuro);color:#fff}
+.btn:hover{background:#00416a}
+.btn.sec{background:transparent;color:var(--azul-escuro);box-shadow:inset 0 0 0 1px var(--azul-escuro)}
+.btn.sec:hover{background:#e3edf4}
+.btn.perigo{background:transparent;color:var(--vermelho);box-shadow:inset 0 0 0 1px var(--vermelho)}
+.btn.perigo:hover{background:#fbeaea}
+.btn.largo{width:100%;padding:13px 16px}
+.btn[disabled]{opacity:.55;cursor:wait}
+
+/* Barra superior */
+.barra{position:sticky;top:0;z-index:1000;background:var(--azul-escuro);color:#fff;display:flex;align-items:center;gap:28px;padding:0 20px;height:56px}
+.marca{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:10px}
+.marca::before{content:"";width:22px;height:8px;background:var(--amarelo)}
+.barra nav{display:flex;gap:18px;height:100%}
+.barra nav button{background:none;border:0;border-bottom:3px solid transparent;color:#bcd6e7;font-weight:600;padding:0 2px;cursor:pointer}
+.barra nav button:hover{color:#fff}
+.barra nav button[aria-current="page"]{color:#fff;border-bottom-color:var(--amarelo)}
+.usuario{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:13px;white-space:nowrap}
+.usuario .perfil{background:rgba(255,255,255,.14);padding:3px 8px;border-radius:3px}
+.usuario button{background:none;border:0;color:#fff;text-decoration:underline;cursor:pointer;padding:0}
+
+main{padding:20px;max-width:1480px;margin:0 auto}
+.cabecalho-secao{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.cabecalho-secao h2{font-size:28px}
+.cabecalho-secao p{margin:2px 0 0;color:var(--suave)}
+
+/* Painel: placas de status */
+#resumo{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.placa{position:relative;background:var(--superficie);border:0;box-shadow:0 0 0 1px var(--linha);border-radius:3px;text-align:left;padding:12px 14px 18px;cursor:pointer;transition:opacity .15s}
+.placa .num{display:block;font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:700;line-height:1}
+.placa .rot{font-size:13px;color:var(--suave)}
+.placa i{position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:0 0 3px 3px}
+.placa.apagada{opacity:.4}
+.placa[aria-pressed="true"]{box-shadow:0 0 0 2px var(--azul-escuro)}
+.dica-filtro{font-size:13px;color:var(--suave);margin:-6px 0 12px}
+
+.grade-painel{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;height:calc(100vh - 56px - 220px);min-height:520px}
+.bloco-mapa{display:flex;flex-direction:column;min-height:0}
+#mapa{flex:1;border-radius:3px;box-shadow:0 0 0 1px var(--linha);min-height:380px}
+.legenda-mapa{font-size:13px;color:var(--suave);margin-top:8px;display:flex;gap:18px;flex-wrap:wrap}
+.legenda-mapa span{display:inline-flex;align-items:center;gap:6px}
+.anel{width:14px;height:14px;border-radius:50%;border:2px dashed}
+
+.coluna-venc{background:var(--superficie);box-shadow:0 0 0 1px var(--linha);border-radius:3px;overflow:auto;padding:18px 16px}
+.coluna-venc h2{font-size:22px;margin-bottom:2px}
+.coluna-venc > p{margin:0 0 12px;color:var(--suave);font-size:13px}
+.coluna-venc h3{font-size:16px;color:var(--suave);margin:18px 0 6px;display:flex;justify-content:space-between}
+.coluna-venc ul{list-style:none;margin:0;padding:0}
+.venc{width:100%;display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:center;text-align:left;background:none;border:0;border-top:1px solid var(--linha);padding:9px 2px;cursor:pointer}
+.venc:hover{background:#f4f8fa}
+.venc .dias{font-family:'Barlow Condensed',sans-serif;text-align:center;border-radius:3px;padding:4px 0;background:var(--fundo)}
+.venc .dias b{display:block;font-size:24px;line-height:1}
+.venc .dias small{font-size:11px;color:var(--suave)}
+.venc.alerta .dias{background:var(--amarelo)}
+.venc.alerta .dias small{color:var(--tinta)}
+.venc.vencido .dias{background:var(--vermelho);color:#fff}
+.venc.vencido .dias small{color:#fde2e2}
+.venc strong{display:block;font-weight:600}
+.venc span small{display:block;color:var(--suave);font-size:13px}
+.sem-data{margin-top:18px;padding-top:12px;border-top:1px solid var(--linha);font-size:13px;color:var(--suave)}
+
+/* Popup do mapa */
+.leaflet-popup-content{margin:12px 14px;font-family:'Barlow',sans-serif;font-size:14px;line-height:1.4;min-width:220px}
+.pop h4{font-family:'Barlow Condensed',sans-serif;font-size:19px;margin:0 0 4px}
+.pop img{width:100%;max-height:120px;object-fit:cover;border-radius:3px;margin-bottom:8px}
+.pop .etiqueta{margin-bottom:6px}
+.pop dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:8px 0}
+.pop dt{color:var(--suave)}
+.pop dd{margin:0}
+.pop button{margin-top:4px}
+
+.etiqueta{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap}
+.etiqueta::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--cor,#999)}
+
+/* Tabela */
+.filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.filtros input,.filtros select{padding:9px 11px;border:1px solid var(--linha);border-radius:4px;background:#fff;min-width:200px}
+.filtros input{flex:1;max-width:420px}
+.tabela-wrap{background:var(--superficie);box-shadow:0 0 0 1px var(--linha);border-radius:3px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--linha);vertical-align:middle}
+th{font-size:13px;font-weight:600;color:var(--suave);background:#f6f9fb;white-space:nowrap}
+tbody tr[data-abrir]{cursor:pointer}
+tbody tr[data-abrir]:hover{background:#f4f8fa}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td .sub{display:block;font-size:13px;color:var(--suave)}
+.dias-txt.alerta{background:var(--amarelo);padding:2px 6px;border-radius:3px;font-weight:600}
+.dias-txt.vencido{background:var(--vermelho);color:#fff;padding:2px 6px;border-radius:3px;font-weight:600}
+.vazio{text-align:center;color:var(--suave);padding:32px}
+
+/* Ficha (painel lateral) */
+.fundo-ficha{position:fixed;inset:0;background:rgba(10,30,45,.35);z-index:1500;opacity:0;pointer-events:none;transition:opacity .2s}
+.fundo-ficha.aberta{opacity:1;pointer-events:auto}
+#ficha{position:fixed;top:0;right:0;bottom:0;width:min(760px,100%);background:var(--superficie);z-index:1600;transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.15)}
+#ficha.aberta{transform:none}
+.ficha-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--linha)}
+.ficha-topo h2{font-size:26px}
+.ficha-topo .fechar{background:none;border:0;font-size:28px;line-height:1;cursor:pointer;color:var(--suave);padding:4px 8px}
+.ficha-corpo{flex:1;overflow:auto;padding:6px 22px 28px}
+fieldset{border:0;padding:0;margin:18px 0 0}
+legend{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:600;color:var(--azul-escuro);padding:0;margin-bottom:8px}
+.campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.campos .inteiro{grid-column:1/-1}
+label.campo{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--suave)}
+label.campo input,label.campo select,label.campo textarea{padding:9px 10px;border:1px solid var(--linha);border-radius:4px;background:#fff;font-weight:400;color:var(--tinta);font-size:15px}
+label.campo input:disabled,label.campo select:disabled,label.campo textarea:disabled{background:#f6f8fa;color:var(--tinta)}
+#mini-mapa{height:220px;border-radius:3px;box-shadow:0 0 0 1px var(--linha);margin-top:10px}
+.ajuda{font-size:13px;color:var(--suave);margin:6px 0 0}
+.prazo{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;padding:10px 12px;border-radius:3px;background:var(--fundo);align-self:end}
+.prazo.alerta{background:var(--amarelo)}
+.prazo.vencido{background:var(--vermelho);color:#fff}
+.imagem-atual{width:100%;max-height:260px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px var(--linha);margin-bottom:8px}
+.acoes-ficha{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--linha);flex-wrap:wrap}
+.acoes-ficha .dir{display:flex;gap:10px;margin-left:auto}
+.carimbo{font-size:13px;color:var(--suave);margin-top:10px}
+
+.linha-tempo{list-style:none;margin:10px 0 0;padding:0 0 0 16px;border-left:3px solid var(--linha)}
+.linha-tempo li{position:relative;padding:0 0 14px 6px}
+.linha-tempo li::before{content:"";position:absolute;left:-24px;top:5px;width:11px;height:11px;border-radius:50%;background:var(--azul);box-shadow:0 0 0 3px #fff}
+.linha-tempo time{font-weight:600}
+.linha-tempo .autor{display:block;font-size:12px;color:var(--suave)}
+.novo-andamento{display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:end;margin-top:8px}
+
+/* Acessos */
+.form-acesso{display:grid;grid-template-columns:1.4fr 1fr 170px auto;gap:10px;align-items:end;background:var(--superficie);box-shadow:0 0 0 1px var(--linha);border-radius:3px;padding:14px;margin-bottom:14px}
+.form-acesso label.campo input,.form-acesso label.campo select{width:100%}
+td select{padding:6px 8px;border:1px solid var(--linha);border-radius:4px;background:#fff}
+.voce{font-size:12px;color:var(--suave);font-weight:600}
+
+/* Aviso */
+#aviso{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--tinta);color:#fff;padding:12px 18px;border-radius:4px;z-index:3000;opacity:0;pointer-events:none;transition:.2s;max-width:min(560px,92vw)}
+#aviso.visivel{opacity:1;transform:translate(-50%,0)}
+#aviso.erro{background:var(--vermelho)}
+
+@media (max-width:1000px){
+  .grade-painel{grid-template-columns:1fr;height:auto}
+  #mapa{height:440px;flex:none}
+  #resumo{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .form-acesso{grid-template-columns:1fr 1fr}
+}
+@media (max-width:640px){
+  .barra{gap:14px;padding:0 12px;overflow-x:auto}
+  .usuario .email{display:none}
+  main{padding:14px}
+  #resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .campos{grid-template-columns:1fr}
+  .novo-andamento{grid-template-columns:1fr}
+  .form-acesso{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- Configuração pendente -->
+<section id="tela-config" class="tela" hidden>
+  <div class="cartao-acesso"><div class="faixa"></div><div class="corpo">
+    <h1>Falta configurar</h1>
+    <p>Preencha <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> no início do script deste arquivo, conforme o LEIA-ME, e publique de novo.</p>
+  </div></div>
+</section>
+
+<!-- Login -->
+<section id="tela-login" class="tela" hidden>
+  <div class="cartao-acesso"><div class="faixa"></div><div class="corpo">
+    <h1>Controle de Outdoors</h1>
+    <p>Entre com a sua conta Microsoft da empresa para acompanhar os pontos, alvarás e processos na PMU.</p>
+    <button id="btn-entrar" class="btn largo">Entrar com a conta Microsoft</button>
+  </div></div>
+</section>
+
+<!-- Acesso não liberado -->
+<section id="tela-bloqueada" class="tela" hidden>
+  <div class="cartao-acesso"><div class="faixa"></div><div class="corpo">
+    <h1>Acesso não liberado</h1>
+    <p>O e-mail <strong id="bloq-email"></strong> ainda não está cadastrado. Peça a um editor do departamento para liberar o seu acesso e entre de novo.</p>
+    <button class="btn sec largo" data-sair>Sair e trocar de conta</button>
+  </div></div>
+</section>
+
+<!-- Aplicação -->
+<div id="app" hidden>
+  <header class="barra">
+    <div class="marca">Controle de Outdoors</div>
+    <nav aria-label="Seções">
+      <button data-view="painel" aria-current="page">Painel</button>
+      <button data-view="outdoors">Outdoors</button>
+      <button data-view="acessos" class="so-editor">Acessos</button>
+    </nav>
+    <div class="usuario">
+      <span class="email" id="u-email"></span>
+      <span class="perfil" id="u-perfil"></span>
+      <button data-sair>Sair</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Painel -->
+    <section id="v-painel">
+      <div id="resumo" role="group" aria-label="Filtrar mapa por status"></div>
+      <p class="dica-filtro">Clique em um status para filtrar o mapa. Clique de novo para limpar.</p>
+      <div class="grade-painel">
+        <div class="bloco-mapa">
+          <div id="mapa" aria-label="Mapa dos outdoors"></div>
+          <div class="legenda-mapa">
+            <span><i class="anel" style="border-color:#E0B000"></i> Alvará vence em até 15 dias</span>
+            <span><i class="anel" style="border-color:var(--vermelho)"></i> Alvará vencido</span>
+          </div>
+        </div>
+        <aside class="coluna-venc" id="vencimentos"></aside>
+      </div>
+    </section>
+
+    <!-- Lista de outdoors -->
+    <section id="v-outdoors" hidden>
+      <div class="cabecalho-secao">
+        <div><h2>Outdoors</h2><p id="contagem"></p></div>
+        <button class="btn so-editor" id="btn-novo">Cadastrar outdoor</button>
+      </div>
+      <div class="filtros">
+        <input id="busca" type="search" placeholder="Buscar por apelido, endereço, alvará ou protocolo" aria-label="Buscar">
+        <select id="f-status" aria-label="Filtrar por status"><option value="">Todos os status</option></select>
+      </div>
+      <div class="tabela-wrap">
+        <table id="tabela">
+          <thead><tr>
+            <th>Outdoor</th><th>Empresa</th><th>Propaganda</th><th>Status</th>
+            <th>Situação PMU</th><th>Alvará</th><th>Vencimento</th><th>Prazo</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Acessos -->
+    <section id="v-acessos" class="so-editor" hidden>
+      <div class="cabecalho-secao">
+        <div><h2>Acessos</h2><p>Editores cadastram e alteram dados, gerenciam acessos e recebem os alertas no Teams. Visualizadores apenas consultam.</p></div>
+      </div>
+      <form id="form-acesso" class="form-acesso">
+        <label class="campo">E-mail Microsoft<input name="email" type="email" required placeholder="nome@empresa.com.br"></label>
+        <label class="campo">Nome<input name="nome" required></label>
+        <label class="campo">Perfil
+          <select name="perfil"><option value="visualizador">Visualizador</option><option value="editor">Editor</option></select>
+        </label>
+        <button class="btn" type="submit">Liberar acesso</button>
+      </form>
+      <div class="tabela-wrap">
+        <table id="tabela-acessos">
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Ficha do outdoor -->
+<div class="fundo-ficha" id="fundo-ficha"></div>
+<aside id="ficha" aria-hidden="true" aria-labelledby="ficha-titulo" role="dialog">
+  <div class="ficha-topo">
+    <h2 id="ficha-titulo">Outdoor</h2>
+    <button class="fechar" data-fechar aria-label="Fechar">×</button>
+  </div>
+  <div class="ficha-corpo">
+    <form id="form-ficha" novalidate>
+      <fieldset>
+        <legend>Identificação</legend>
+        <div class="campos">
+          <label class="campo">Empresa *<input name="empresa" list="l-empresas" required></label>
+          <label class="campo">Apelido *<input name="apelido" required></label>
+          <label class="campo inteiro">Propaganda<input name="propaganda" list="l-propaganda"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Localização</legend>
+        <div class="campos">
+          <label class="campo inteiro">Endereço<input name="endereco"></label>
+          <label class="campo">Cidade<input name="cidade"></label>
+          <span></span>
+          <label class="campo">Latitude<input name="latitude" inputmode="decimal" placeholder="-18.9186"></label>
+          <label class="campo">Longitude<input name="longitude" inputmode="decimal" placeholder="-48.2772"></label>
+        </div>
+        <div id="mini-mapa"></div>
+        <p class="ajuda so-editor">Clique no mapa para preencher latitude e longitude.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Alvará</legend>
+        <div class="campos">
+          <label class="campo">Data de início<input name="data_inicio" type="date"></label>
+          <label class="campo">Vencimento<input name="vencimento" type="date"></label>
+          <label class="campo">Nº do alvará<input name="numero_alvara"></label>
+          <div class="prazo" id="prazo">Sem vencimento</div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Status e processo na PMU</legend>
+        <div class="campos">
+          <label class="campo">Status *<select name="status" required></select></label>
+          <label class="campo">Situação na PMU<select name="situacao_pmu"></select></label>
+          <label class="campo">Protocolo PMU<input name="protocolo_pmu"></label>
+          <span></span>
+          <label class="campo inteiro">Impedimentos<textarea name="impedimentos" rows="2"></textarea></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Imagem</legend>
+        <img id="imagem-atual" class="imagem-atual" alt="Foto do outdoor" hidden>
+        <p class="ajuda" id="sem-imagem">Nenhuma imagem cadastrada.</p>
+        <label class="campo so-editor">Enviar nova imagem<input name="imagem" type="file" accept="image/*"></label>
+      </fieldset>
+
+      <div class="acoes-ficha">
+        <button type="button" class="btn perigo so-editor" id="btn-excluir" data-sempre>Excluir outdoor</button>
+        <div class="dir">
+          <button type="button" class="btn sec" data-fechar data-sempre>Fechar</button>
+          <button type="submit" class="btn so-editor" id="btn-salvar">Salvar alterações</button>
+        </div>
+      </div>
+      <p class="carimbo" id="carimbo"></p>
+    </form>
+
+    <fieldset id="bloco-andamentos">
+      <legend>Andamentos</legend>
+      <form id="form-andamento" class="novo-andamento so-editor">
+        <label class="campo">Data<input name="data" type="date" required></label>
+        <label class="campo">O que aconteceu<input name="descricao" required placeholder="Ex.: Protocolo de renovação entregue na PMU"></label>
+        <button class="btn" type="submit">Registrar</button>
+      </form>
+      <ol class="linha-tempo" id="linha-tempo"></ol>
+    </fieldset>
+  </div>
+</aside>
+
+<datalist id="l-empresas"><option value="Maqnelson Empreendimentos"><option value="Negócios"></datalist>
+<datalist id="l-propaganda"><option value="Outdoor 1 face - 9x3"><option value="Outdoor 2 faces - 18x3"></datalist>
+<div id="aviso" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* =========================================================
+   CONFIGURAÇÃO - preencha com os dados do seu projeto Supabase
+   (Project Settings > API). A chave "anon" é pública por
+   natureza; a segurança está nas regras do banco.
+   NUNCA coloque aqui a chave service_role.
+   ========================================================= */
+const CONFIG = {
+  SUPABASE_URL: 'https://ossoirzjcebjjnntrtkw.supabase.co',
+  SUPABASE_ANON_KEY: 'SUA-CHAVE-ANON',
+  BUCKET: 'outdoor-imagens'
+};
+
+const STATUS = {
+  'Ativo': '#1EA438',
+  'Em andamento': '#1D8ECE',
+  'Em licenciamento': '#FDDC00',
+  'Renovação': '#005081',
+  'Em encerramento': '#E07B00',
+  'Encerrado': '#8795A1'
+};
+const SITUACOES = ['Protocolado', 'Tramitando', 'Indeferido', 'Baixado', 'Arquivado'];
+const CAMPOS = ['empresa','apelido','propaganda','endereco','cidade','latitude','longitude',
+  'data_inicio','vencimento','numero_alvara','status','situacao_pmu','protocolo_pmu','impedimentos'];
+const CENTRO = [-18.9186, -48.2772];
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let sb;
+const S = { email:'', perfil:null, iniciado:false, outdoors:[], usuarios:[], filtro:new Set(),
+            mapa:null, camada:null, mini:null, pino:null, atual:null };
+
+/* ---------- Datas ---------- */
+function hoje(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function lerData(s){ if(!s) return null; const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function fmtData(s){ const d = lerData(s); return d ? d.toLocaleDateString('pt-BR') : '—'; }
+function diasAte(venc){ const d = lerData(venc); return d ? Math.round((d - hoje()) / 864e5) : null; }
+function classePrazo(o){
+  const n = diasAte(o.vencimento);
+  if (o.status === 'Encerrado' || n === null) return '';
+  return n < 0 ? 'vencido' : n <= 15 ? 'alerta' : '';
+}
+function textoPrazo(n){
+  if (n === null) return 'Sem vencimento';
+  if (n < 0) return `Vencido há ${-n} ${-n === 1 ? 'dia' : 'dias'}`;
+  if (n === 0) return 'Vence hoje';
+  return `Vence em ${n} ${n === 1 ? 'dia' : 'dias'}`;
+}
+
+/* ---------- Avisos ---------- */
+let tAviso;
+function avisar(msg, tipo){
+  const el = $('#aviso'); el.textContent = msg; el.className = 'visivel' + (tipo === 'erro' ? ' erro' : '');
+  clearTimeout(tAviso); tAviso = setTimeout(() => el.className = '', tipo === 'erro' ? 6000 : 3000);
+}
+function msgErro(e){
+  const m = e?.message || String(e);
+  if (/row-level security|permission denied/i.test(m)) return 'Seu perfil não permite esta alteração.';
+  if (/duplicate key.*usuarios/i.test(m)) return 'Este e-mail já tem acesso cadastrado.';
+  return m;
+}
+
+/* ---------- Telas e autenticação ---------- */
+function mostrar(id){
+  ['tela-config','tela-login','tela-bloqueada','app'].forEach(t => $('#'+t).hidden = t !== id);
+}
+
+async function iniciar(){
+  if (CONFIG.SUPABASE_URL.includes('SEU-PROJETO') || CONFIG.SUPABASE_ANON_KEY.includes('SUA-CHAVE')) { mostrar('tela-config'); return; }
+  sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((evento, sessao) => {
+    if (evento === 'SIGNED_OUT') { S.iniciado = false; mostrar('tela-login'); return; }
+    if (evento === 'INITIAL_SESSION' || evento === 'SIGNED_IN') setTimeout(() => tratarSessao(sessao), 0);
+  });
+}
+
+async function tratarSessao(sessao){
+  if (!sessao) { mostrar('tela-login'); return; }
+  if (S.iniciado) return;
+  S.email = (sessao.user.email || '').toLowerCase();
+  const { data, error } = await sb.rpc('perfil_atual');
+  if (error || !data) {
+    $('#bloq-email').textContent = S.email || '(conta sem e-mail)';
+    mostrar('tela-bloqueada'); return;
+  }
+  S.perfil = data; S.iniciado = true;
+  mostrar('app');
+  await montarApp();
+}
+
+async function entrar(){
+  const btn = $('#btn-entrar'); btn.disabled = true;
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'azure',
+    options: { scopes: 'email', redirectTo: location.origin + location.pathname }
+  });
+  if (error) { btn.disabled = false; avisar(msgErro(error), 'erro'); }
+}
+async function sair(){ await sb.auth.signOut(); location.reload(); }
+
+/* ---------- Montagem ---------- */
+async function montarApp(){
+  document.body.classList.toggle('visualizador', S.perfil !== 'editor');
+  $('#u-email').textContent = S.email;
+  $('#u-perfil').textContent = S.perfil === 'editor' ? 'Editor' : 'Visualizador';
+
+  const opcStatus = Object.keys(STATUS).map(s => `<option>${esc(s)}</option>`).join('');
+  $('#f-status').insertAdjacentHTML('beforeend', opcStatus);
+  $('#form-ficha').elements.status.innerHTML = opcStatus;
+  $('#form-ficha').elements.situacao_pmu.innerHTML = '<option value="">Não informada</option>' +
+    SITUACOES.map(s => `<option>${esc(s)}</option>`).join('');
+
+  iniciarMapa();
+  await recarregar(true);
+  if (S.perfil === 'editor') carregarUsuarios();
+
+  let tRt;
+  sb.channel('outdoors-mudancas')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'outdoors' },
+        () => { clearTimeout(tRt); tRt = setTimeout(() => recarregar(false), 400); })
+    .subscribe();
+}
+
+async function recarregar(ajustarMapa){
+  const { data, error } = await sb.from('outdoors').select('*').order('apelido');
+  if (error) { avisar(msgErro(error), 'erro'); return; }
+  S.outdoors = data || [];
+  renderResumo(); renderMapa(ajustarMapa); renderVencimentos(); renderTabela();
+}
+
+function trocarVisao(v){
+  $$('.barra nav button').forEach(b =>
+    b.dataset.view === v ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  ['painel','outdoors','acessos'].forEach(s => $('#v-'+s).hidden = s !== v);
+  if (v === 'painel' && S.mapa) setTimeout(() => S.mapa.invalidateSize(), 50);
+}
+
+/* ---------- Painel ---------- */
+function renderResumo(){
+  const cont = Object.fromEntries(Object.keys(STATUS).map(k => [k, 0]));
+  S.outdoors.forEach(o => cont[o.status] = (cont[o.status] || 0) + 1);
+  $('#resumo').innerHTML = Object.keys(STATUS).map(k => {
+    const on = S.filtro.has(k), off = S.filtro.size && !on;
+    return `<button class="placa${off ? ' apagada' : ''}" data-status="${esc(k)}" aria-pressed="${on}">
+      <span class="num">${cont[k]}</span><span class="rot">${esc(k)}</span><i style="background:${STATUS[k]}"></i></button>`;
+  }).join('');
+}
+
+function visiveis(){ return S.filtro.size ? S.outdoors.filter(o => S.filtro.has(o.status)) : S.outdoors; }
+
+function iniciarMapa(){
+  S.mapa = L.map('mapa').setView(CENTRO, 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(S.mapa);
+  S.camada = L.layerGroup().addTo(S.mapa);
+}
+
+function htmlPopup(o){
+  const n = diasAte(o.vencimento);
+  return `<div class="pop">
+    ${o.imagem_url ? `<img src="${esc(o.imagem_url)}" alt="">` : ''}
+    <h4>${esc(o.apelido)}</h4>
+    <div class="etiqueta" style="--cor:${STATUS[o.status] || '#999'}">${esc(o.status)}</div>
+    <div>${esc(o.endereco || '')}</div>
+    <dl>
+      <dt>Empresa</dt><dd>${esc(o.empresa)}</dd>
+      <dt>Alvará</dt><dd>${esc(o.numero_alvara || 'Sem número')}</dd>
+      <dt>Vencimento</dt><dd>${fmtData(o.vencimento)}${n !== null && o.status !== 'Encerrado' ? ` (${textoPrazo(n).toLowerCase()})` : ''}</dd>
+      ${o.situacao_pmu ? `<dt>PMU</dt><dd>${esc(o.situacao_pmu)}${o.protocolo_pmu ? ', protocolo ' + esc(o.protocolo_pmu) : ''}</dd>` : ''}
+    </dl>
+    <button class="btn" data-abrir="${o.id}">Abrir ficha</button></div>`;
+}
+
+function renderMapa(ajustar){
+  if (!S.camada) return;
+  S.camada.clearLayers();
+  const pontos = [];
+  visiveis().forEach(o => {
+    if (o.latitude == null || o.longitude == null) return;
+    const ll = [o.latitude, o.longitude]; pontos.push(ll);
+    const cp = classePrazo(o);
+    if (cp) L.circleMarker(ll, { radius: 16, color: cp === 'vencido' ? '#C62828' : '#E0B000',
+      weight: 3, dashArray: '4 4', fill: false, interactive: false }).addTo(S.camada);
+    L.circleMarker(ll, { radius: 9, color: '#fff', weight: 2, fillColor: STATUS[o.status] || '#8795A1', fillOpacity: 1 })
+      .bindTooltip(esc(o.apelido)).bindPopup(htmlPopup(o), { maxWidth: 280 }).addTo(S.camada);
+  });
+  if (ajustar && pontos.length) S.mapa.fitBounds(pontos, { padding: [40, 40], maxZoom: 15 });
+}
+
+function renderVencimentos(){
+  const ativos = S.outdoors.filter(o => o.status !== 'Encerrado');
+  const lista = ativos.filter(o => o.vencimento).map(o => ({ o, n: diasAte(o.vencimento) })).sort((a, b) => a.n - b.n);
+  const faixas = [
+    ['Vencidos', n => n < 0],
+    ['Próximos 15 dias', n => n >= 0 && n <= 15],
+    ['De 16 a 90 dias', n => n > 15 && n <= 90],
+    ['De 91 dias a 1 ano', n => n > 90 && n <= 365],
+    ['Mais de 1 ano', n => n > 365]
+  ];
+  const semData = ativos.filter(o => !o.vencimento).length;
+  let html = `<h2>Vencimento dos alvarás</h2><p>Os editores recebem alerta no Teams aos 15, 10 e 5 dias.</p>`;
+  faixas.forEach(([titulo, teste]) => {
+    const itens = lista.filter(x => teste(x.n));
+    if (!itens.length) return;
+    html += `<h3>${titulo}<span>${itens.length}</span></h3><ul>` + itens.map(({ o, n }) => {
+      const cls = n < 0 ? 'vencido' : n <= 15 ? 'alerta' : '';
+      const num = n < 0 ? -n : n;
+      const rot = n < 0 ? 'dias atrás' : n === 1 ? 'dia' : 'dias';
+      return `<li><button class="venc ${cls}" data-abrir="${o.id}">
+        <span class="dias"><b>${num}</b><small>${rot}</small></span>
+        <span><strong>${esc(o.apelido)}</strong><small>Alvará ${esc(o.numero_alvara || 'sem número')}, vence em ${fmtData(o.vencimento)}</small></span>
+      </button></li>`;
+    }).join('') + '</ul>';
+  });
+  if (!lista.length) html += `<p>Nenhum alvará com data de vencimento cadastrada.</p>`;
+  if (semData) html += `<p class="sem-data">${semData} ${semData === 1 ? 'outdoor em processo ainda não tem' : 'outdoors em processo ainda não têm'} data de vencimento e ficam fora dos alertas.</p>`;
+  $('#vencimentos').innerHTML = html;
+}
+
+/* ---------- Tabela ---------- */
+function renderTabela(){
+  const q = $('#busca').value.trim().toLowerCase();
+  const st = $('#f-status').value;
+  const linhas = S.outdoors.filter(o => (!st || o.status === st) &&
+    (!q || [o.apelido, o.endereco, o.empresa, o.numero_alvara, o.protocolo_pmu].join(' ').toLowerCase().includes(q)));
+  $('#contagem').textContent = `${linhas.length} de ${S.outdoors.length} outdoors`;
+  $('#tabela tbody').innerHTML = linhas.map(o => {
+    const n = diasAte(o.vencimento), cp = classePrazo(o);
+    const prazo = o.status === 'Encerrado' ? '—' : `<span class="dias-txt ${cp}">${textoPrazo(n)}</span>`;
+    return `<tr data-abrir="${o.id}" tabindex="0">
+      <td><strong>${esc(o.apelido)}</strong><span class="sub">${esc(o.endereco || '')}</span></td>
+      <td>${esc(o.empresa)}</td>
+      <td>${esc(o.propaganda || '—')}</td>
+      <td><span class="etiqueta" style="--cor:${STATUS[o.status] || '#999'}">${esc(o.status)}</span></td>
+      <td>${esc(o.situacao_pmu || '—')}${o.protocolo_pmu ? `<span class="sub">${esc(o.protocolo_pmu)}</span>` : ''}</td>
+      <td class="num">${esc(o.numero_alvara || '—')}</td>
+      <td class="num">${fmtData(o.vencimento)}</td>
+      <td class="num">${prazo}</td></tr>`;
+  }).join('') || `<tr><td colspan="8" class="vazio">Nenhum outdoor encontrado. Ajuste a busca ou o filtro de status.</td></tr>`;
+}
+
+/* ---------- Ficha ---------- */
+function abrirFicha(id){
+  const novo = !id;
+  const o = novo ? { status: 'Em andamento', cidade: 'Uberlândia' } : S.outdoors.find(x => x.id === id);
+  if (!o) return;
+  S.atual = o;
+  const f = $('#form-ficha'); f.reset();
+  CAMPOS.forEach(c => { f.elements[c].value = o[c] ?? ''; });
+  $('#ficha-titulo').textContent = novo ? 'Novo outdoor' : o.apelido;
+  atualizarPrazo();
+
+  const img = $('#imagem-atual');
+  img.hidden = !o.imagem_url; $('#sem-imagem').hidden = !!o.imagem_url;
+  if (o.imagem_url) img.src = o.imagem_url;
+
+  const soLeitura = S.perfil !== 'editor';
+  [...f.elements].forEach(el => { if (!('sempre' in el.dataset)) el.disabled = soLeitura; });
+  $('#btn-excluir').hidden = novo || soLeitura;
+  $('#btn-salvar').textContent = novo ? 'Cadastrar outdoor' : 'Salvar alterações';
+  $('#carimbo').textContent = novo ? '' :
+    `Última alteração em ${new Date(o.atualizado_em).toLocaleString('pt-BR')} por ${o.atualizado_por || '—'}.`;
+
+  $('#bloco-andamentos').hidden = novo;
+  $('#form-andamento').elements.data.value = new Date().toISOString().slice(0, 10);
+  if (!novo) carregarAndamentos(o.id);
+
+  S.mapa?.closePopup();
+  $('#ficha').classList.add('aberta'); $('#ficha').setAttribute('aria-hidden', 'false');
+  $('#fundo-ficha').classList.add('aberta');
+  prepararMiniMapa(o);
+  setTimeout(() => f.elements[novo ? 'empresa' : 'apelido'].focus({ preventScroll: true }), 260);
+}
+
+function fecharFicha(){
+  $('#ficha').classList.remove('aberta'); $('#ficha').setAttribute('aria-hidden', 'true');
+  $('#fundo-ficha').classList.remove('aberta');
+  S.atual = null;
+}
+
+function atualizarPrazo(){
+  const f = $('#form-ficha'); const n = diasAte(f.elements.vencimento.value);
+  const encerrado = f.elements.status.value === 'Encerrado';
+  const el = $('#prazo');
+  el.textContent = encerrado ? 'Encerrado, sem alertas' : textoPrazo(n);
+  el.className = 'prazo' + (!encerrado && n !== null ? (n < 0 ? ' vencido' : n <= 15 ? ' alerta' : '') : '');
+}
+
+function prepararMiniMapa(o){
+  if (!S.mini) {
+    S.mini = L.map('mini-mapa').setView(CENTRO, 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(S.mini);
+    S.mini.on('click', ev => {
+      if (S.perfil !== 'editor') return;
+      const f = $('#form-ficha');
+      f.elements.latitude.value = ev.latlng.lat.toFixed(7);
+      f.elements.longitude.value = ev.latlng.lng.toFixed(7);
+      posicionarPino([ev.latlng.lat, ev.latlng.lng]);
+    });
+  }
+  setTimeout(() => {
+    S.mini.invalidateSize();
+    if (o.latitude != null && o.longitude != null) { posicionarPino([o.latitude, o.longitude]); S.mini.setView([o.latitude, o.longitude], 16); }
+    else { if (S.pino) { S.mini.removeLayer(S.pino); S.pino = null; } S.mini.setView(CENTRO, 12); }
+  }, 280);
+}
+function posicionarPino(ll){
+  if (S.pino) S.pino.setLatLng(ll);
+  else S.pino = L.circleMarker(ll, { radius: 9, color: '#fff', weight: 2, fillColor: '#005081', fillOpacity: 1 }).addTo(S.mini);
+}
+function coordenadaDigitada(){
+  const f = $('#form-ficha');
+  const lat = Number(f.elements.latitude.value.replace(',', '.'));
+  const lng = Number(f.elements.longitude.value.replace(',', '.'));
+  if (f.elements.latitude.value && f.elements.longitude.value && !isNaN(lat) && !isNaN(lng)) {
+    posicionarPino([lat, lng]); S.mini.setView([lat, lng], 16);
+  }
+}
+
+async function salvarFicha(e){
+  e.preventDefault();
+  if (S.perfil !== 'editor') return;
+  const f = e.target, reg = {};
+  CAMPOS.forEach(c => { const v = String(f.elements[c].value).trim(); reg[c] = v === '' ? null : v; });
+  if (!reg.empresa || !reg.apelido) { avisar('Preencha empresa e apelido.', 'erro'); return; }
+  for (const c of ['latitude', 'longitude']) {
+    if (reg[c] === null) continue;
+    reg[c] = Number(String(reg[c]).replace(',', '.'));
+    if (isNaN(reg[c])) { avisar(`${c === 'latitude' ? 'Latitude' : 'Longitude'} inválida. Use ponto ou vírgula, ex.: -18.9186`, 'erro'); return; }
+  }
+  if (reg.data_inicio && reg.vencimento && reg.vencimento < reg.data_inicio) {
+    avisar('O vencimento não pode ser anterior à data de início.', 'erro'); return;
+  }
+
+  const btn = $('#btn-salvar'); btn.disabled = true;
+  try {
+    const arq = f.elements.imagem.files[0];
+    if (arq) {
+      const caminho = `${crypto.randomUUID()}-${arq.name.replace(/[^\w.-]/g, '_')}`;
+      const up = await sb.storage.from(CONFIG.BUCKET).upload(caminho, arq, { contentType: arq.type });
+      if (up.error) throw up.error;
+      reg.imagem_url = sb.storage.from(CONFIG.BUCKET).getPublicUrl(caminho).data.publicUrl;
+    }
+    const novo = !S.atual.id;
+    const res = novo
+      ? await sb.from('outdoors').insert(reg).select().single()
+      : await sb.from('outdoors').update(reg).eq('id', S.atual.id).select().single();
+    if (res.error) throw res.error;
+    await recarregar(false);
+    avisar(novo ? 'Outdoor cadastrado.' : 'Alterações salvas.');
+    abrirFicha(res.data.id);
+  } catch (err) { avisar(msgErro(err), 'erro'); }
+  finally { btn.disabled = false; }
+}
+
+async function excluirOutdoor(){
+  const o = S.atual; if (!o?.id) return;
+  if (!confirm(`Excluir "${o.apelido}"? O histórico de andamentos também será apagado.\n\nPara manter o registro, prefira alterar o status para Encerrado.`)) return;
+  const { error } = await sb.from('outdoors').delete().eq('id', o.id);
+  if (error) { avisar(msgErro(error), 'erro'); return; }
+  fecharFicha(); await recarregar(false); avisar('Outdoor excluído.');
+}
+
+async function carregarAndamentos(id){
+  const lt = $('#linha-tempo'); lt.innerHTML = '<li>Carregando…</li>';
+  const { data, error } = await sb.from('andamentos').select('*').eq('outdoor_id', id)
+    .order('data', { ascending: false }).order('criado_em', { ascending: false });
+  if (error) { lt.innerHTML = `<li>${esc(msgErro(error))}</li>`; return; }
+  lt.innerHTML = (data || []).map(a => `<li><time>${fmtData(a.data)}</time> ${esc(a.descricao)}
+    <span class="autor">${esc(a.autor || '')}</span></li>`).join('')
+    || '<li>Nenhum andamento registrado ainda.</li>';
+}
+
+async function registrarAndamento(e){
+  e.preventDefault();
+  const f = e.target; const descricao = f.elements.descricao.value.trim();
+  if (!descricao || !S.atual?.id) return;
+  const { error } = await sb.from('andamentos').insert({ outdoor_id: S.atual.id, data: f.elements.data.value, descricao });
+  if (error) { avisar(msgErro(error), 'erro'); return; }
+  f.elements.descricao.value = '';
+  carregarAndamentos(S.atual.id); avisar('Andamento registrado.');
+}
+
+/* ---------- Acessos ---------- */
+async function carregarUsuarios(){
+  const { data, error } = await sb.from('usuarios').select('*').order('nome');
+  if (error) { avisar(msgErro(error), 'erro'); return; }
+  S.usuarios = data || []; renderAcessos();
+}
+function renderAcessos(){
+  $('#tabela-acessos tbody').innerHTML = S.usuarios.map(u => `<tr>
+    <td>${esc(u.nome || '—')} ${u.email === S.email ? '<span class="voce">(você)</span>' : ''}</td>
+    <td>${esc(u.email)}</td>
+    <td><select data-perfil="${u.id}" aria-label="Perfil de ${esc(u.email)}">
+      <option value="editor"${u.perfil === 'editor' ? ' selected' : ''}>Editor</option>
+      <option value="visualizador"${u.perfil === 'visualizador' ? ' selected' : ''}>Visualizador</option></select></td>
+    <td><label><input type="checkbox" data-ativo="${u.id}"${u.ativo ? ' checked' : ''}> Ativo</label></td>
+    <td><button class="btn perigo" data-remover="${u.id}">Remover</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="vazio">Nenhum acesso cadastrado.</td></tr>';
+}
+async function alterarUsuario(id, campos){
+  const { error } = await sb.from('usuarios').update(campos).eq('id', id);
+  if (error) avisar(msgErro(error), 'erro'); else avisar('Acesso atualizado.');
+  await carregarUsuarios();
+  const eu = S.usuarios.find(u => u.email === S.email);
+  if (!eu || !eu.ativo || eu.perfil !== 'editor') location.reload();
+}
+async function liberarAcesso(e){
+  e.preventDefault();
+  const f = e.target;
+  const reg = { email: f.elements.email.value.trim().toLowerCase(), nome: f.elements.nome.value.trim(), perfil: f.elements.perfil.value };
+  const { error } = await sb.from('usuarios').insert(reg);
+  if (error) { avisar(msgErro(error), 'erro'); return; }
+  f.reset(); avisar(`Acesso liberado para ${reg.email}.`); carregarUsuarios();
+}
+
+/* ---------- Eventos ---------- */
+document.addEventListener('click', e => {
+  const alvo = e.target;
+  if (alvo.closest('#btn-entrar')) return entrar();
+  if (alvo.closest('[data-sair]')) return sair();
+  const nav = alvo.closest('.barra nav button'); if (nav) return trocarVisao(nav.dataset.view);
+  const placa = alvo.closest('.placa');
+  if (placa) {
+    const s = placa.dataset.status;
+    S.filtro.has(s) ? S.filtro.delete(s) : S.filtro.add(s);
+    renderResumo(); renderMapa(true); return;
+  }
+  const abrir = alvo.closest('[data-abrir]'); if (abrir) return abrirFicha(abrir.dataset.abrir);
+  if (alvo.closest('[data-fechar]') || alvo.id === 'fundo-ficha') return fecharFicha();
+  if (alvo.closest('#btn-novo')) return abrirFicha(null);
+  if (alvo.closest('#btn-excluir')) return excluirOutdoor();
+  const rem = alvo.closest('[data-remover]');
+  if (rem) {
+    const u = S.usuarios.find(x => x.id === rem.dataset.remover);
+    if (u && confirm(`Remover o acesso de ${u.email}?`)) {
+      sb.from('usuarios').delete().eq('id', u.id).then(({ error }) => {
+        if (error) avisar(msgErro(error), 'erro'); else avisar('Acesso removido.');
+        carregarUsuarios().then(() => { if (u.email === S.email) location.reload(); });
+      });
+    }
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.perfil) alterarUsuario(t.dataset.perfil, { perfil: t.value });
+  if (t.dataset.ativo) alterarUsuario(t.dataset.ativo, { ativo: t.checked });
+  if (t.form?.id === 'form-ficha' && (t.name === 'vencimento' || t.name === 'status')) atualizarPrazo();
+  if (t.form?.id === 'form-ficha' && (t.name === 'latitude' || t.name === 'longitude')) coordenadaDigitada();
+  if (t.form?.id === 'form-ficha' && t.name === 'imagem' && t.files[0]) {
+    const img = $('#imagem-atual'); img.src = URL.createObjectURL(t.files[0]); img.hidden = false; $('#sem-imagem').hidden = true;
+  }
+  if (t.id === 'f-status') renderTabela();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#ficha').classList.contains('aberta')) fecharFicha();
+  if (e.key === 'Enter' && e.target.matches('tr[data-abrir]')) abrirFicha(e.target.dataset.abrir);
+});
+$('#busca').addEventListener('input', renderTabela);
+$('#form-ficha').addEventListener('submit', salvarFicha);
+$('#form-andamento').addEventListener('submit', registrarAndamento);
+$('#form-acesso').addEventListener('submit', liberarAcesso);
+
+iniciar();
+</script>
+</body>
+</html>
