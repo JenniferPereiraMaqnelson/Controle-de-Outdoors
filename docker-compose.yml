@@ -1,0 +1,8 @@
+services:
+  controle-outdoors:
+    build: .
+    image: controle-outdoors:latest
+    container_name: controle-outdoors
+    restart: unless-stopped
+    ports:
+      - "8085:80"   # porta do servidor : porta do contêiner (troque 8085 se já estiver em uso)
